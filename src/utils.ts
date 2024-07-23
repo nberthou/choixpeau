@@ -1,6 +1,6 @@
 import { Relation, Student, House } from "./types";
 
-export const splitStudentsIntoHouses = (
+export const assignStudentsToHouses = (
   students: Student[],
   relations: Relation[]
 ) => {
@@ -11,92 +11,96 @@ export const splitStudentsIntoHouses = (
     [House.SLYTHERIN]: []
   };
 
-  const houseMap = new Map<Student, House>();
+  const newStudents = students;
 
-  const findLeastFilledHouse = (): House => {
-    let minHouse = Object.keys(houses)[0] as House;
-    Object.keys(houses).forEach((house) => {
-      if (houses[house as House].length < houses[minHouse].length) {
-        minHouse = house as House;
-      }
-    });
-    return minHouse;
+  const getRandomAvailableHouse = () => {
+    const availableHouses = Object.keys(houses).filter(
+      (house) =>
+        houses[house as House].length < Math.ceil(newStudents.length / 4)
+    );
+    return availableHouses[Math.floor(Math.random() * availableHouses.length)];
   };
 
-  const addStudentToHouse = (student: Student, house: House) => {
-    houses[house]?.push(student);
-    houseMap.set(student, house);
-  };
-
-  const processRelation = (relation: Relation) => {
-    const { firstStudent, secondStudent, relation: relationType } = relation;
-    const firstStudentHouse = houseMap.get(firstStudent);
-    const secondStudentHouse = houseMap.get(secondStudent);
-
-    if (relationType === "SHOULD") {
+  for (const relation of relations) {
+    if (relation.relation === "SHOULD") {
+      const firstStudentIndex = newStudents.findIndex(
+        (student) => student.name === relation.firstStudent.name
+      );
+      const secondStudentIndex = newStudents.findIndex(
+        (student) => student.name === relation.secondStudent.name
+      );
       if (
-        firstStudentHouse &&
-        secondStudentHouse &&
-        firstStudentHouse !== secondStudentHouse
+        !newStudents[firstStudentIndex].house &&
+        !newStudents[secondStudentIndex].house
       ) {
-        if (
-          houses[firstStudentHouse]!.length < houses[secondStudentHouse]!.length
-        ) {
-          addStudentToHouse(secondStudent, firstStudentHouse);
-        } else {
-          addStudentToHouse(firstStudent, secondStudentHouse);
-        }
-      } else if (firstStudentHouse) {
-        addStudentToHouse(secondStudent, firstStudentHouse);
-      } else if (secondStudentHouse) {
-        addStudentToHouse(firstStudent, secondStudentHouse);
-      } else {
-        const newHouse = findLeastFilledHouse();
-        addStudentToHouse(firstStudent, newHouse);
-        addStudentToHouse(secondStudent, newHouse);
-      }
-    } else if (relationType === "SHOULD_NOT") {
-      if (
-        firstStudentHouse &&
-        secondStudentHouse &&
-        firstStudentHouse === secondStudentHouse
-      ) {
-        addStudentToHouse(secondStudent, findLeastFilledHouse());
-      } else if (firstStudentHouse) {
-        addStudentToHouse(secondStudent, findLeastFilledHouse());
-      } else if (secondStudentHouse) {
-        addStudentToHouse(firstStudent, findLeastFilledHouse());
-      } else {
-        addStudentToHouse(firstStudent, findLeastFilledHouse());
-        addStudentToHouse(secondStudent, findLeastFilledHouse());
+        const house = getRandomAvailableHouse();
+        houses[house as House].push(newStudents[firstStudentIndex]);
+        houses[house as House].push(newStudents[secondStudentIndex]);
+        newStudents[firstStudentIndex].house = house as House;
+        newStudents[secondStudentIndex].house = house as House;
+      } else if (!newStudents[firstStudentIndex].house) {
+        newStudents[firstStudentIndex].house =
+          newStudents[secondStudentIndex].house;
+      } else if (!newStudents[secondStudentIndex].house) {
+        newStudents[secondStudentIndex].house =
+          newStudents[firstStudentIndex].house;
       }
     }
-  };
-
-  const randomStudents = students.sort(() => Math.random() - 0.5);
-
-  const studentMap = new Map(students.map((s) => [s.name, s]));
-
-  if (relations.length > 0) {
-    relations.forEach((rel) => {
-      const stud1 = studentMap.get(rel.firstStudent.name);
-      const stud2 = studentMap.get(rel.secondStudent.name);
-      if (stud1 && stud2) processRelation(rel);
-    });
   }
 
-  randomStudents.forEach((student) => {
-    if (!houseMap.has(student)) {
-      addStudentToHouse(student, findLeastFilledHouse());
+  for (const relation of relations) {
+    if (relation.relation === "SHOULD_NOT") {
+      const firstStudentIndex = newStudents.findIndex(
+        (student) => student.name === relation.firstStudent.name
+      );
+      const secondStudentIndex = newStudents.findIndex(
+        (student) => student.name === relation.secondStudent.name
+      );
+
+      if (
+        !newStudents[firstStudentIndex].house &&
+        !newStudents[secondStudentIndex].house
+      ) {
+        const firstHouse = getRandomAvailableHouse();
+        const secondHouse =
+          firstHouse === getRandomAvailableHouse()
+            ? firstHouse === House.GRYFFINDOR
+              ? House.SLYTHERIN
+              : firstHouse === House.HUFFLEPUFF
+              ? House.RAVENCLAW
+              : House.GRYFFINDOR
+            : getRandomAvailableHouse();
+
+        houses[firstHouse as House].push(newStudents[firstStudentIndex]);
+        houses[secondHouse as House].push(newStudents[secondStudentIndex]);
+
+        newStudents[firstStudentIndex].house = firstHouse as House;
+        newStudents[secondStudentIndex].house = secondHouse as House;
+      } else if (!newStudents[firstStudentIndex].house) {
+        newStudents[firstStudentIndex].house =
+          newStudents[secondStudentIndex].house === House.GRYFFINDOR
+            ? House.SLYTHERIN
+            : newStudents[secondStudentIndex].house === House.HUFFLEPUFF
+            ? House.RAVENCLAW
+            : House.GRYFFINDOR;
+      } else if (!newStudents[secondStudentIndex].house) {
+        newStudents[secondStudentIndex].house =
+          newStudents[firstStudentIndex].house === House.GRYFFINDOR
+            ? House.SLYTHERIN
+            : newStudents[firstStudentIndex].house === House.HUFFLEPUFF
+            ? House.RAVENCLAW
+            : House.GRYFFINDOR;
+      }
     }
+  }
+  const unassignedStudents = newStudents.filter((student) => !student.house);
+  unassignedStudents.forEach((student) => {
+    const house = getRandomAvailableHouse();
+    houses[house as House].push(student);
+    student.house = house as House;
   });
 
-  return {
-    houses,
-    students: randomStudents.sort((a, b) => {
-      return a.name.localeCompare(b.name);
-    })
-  };
+  return { houses, students: newStudents };
 };
 
 export const colorsByHouse = {

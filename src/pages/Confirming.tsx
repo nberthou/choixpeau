@@ -2,7 +2,7 @@ import { FC, useEffect } from "react";
 import { useStore } from "@tanstack/react-store";
 import { store } from "../store";
 import { House, Steps, Student } from "../types";
-import { splitStudentsIntoHouses } from "../utils";
+import { assignStudentsToHouses } from "../utils";
 import { StudentList } from "../components/StudentsList";
 import { styled } from "@pigment-css/react";
 import { Button } from "../components/Button";
@@ -31,26 +31,20 @@ export const Confirming: FC = () => {
     }));
   };
 
-  const { houses: filledHouses } = splitStudentsIntoHouses(students, relations);
-
   useEffect(() => {
-    store.setState((state) => {
-      const newStudents: Student[] = [
-        ...(Object.keys(filledHouses) as House[])
-          .map((key: House) =>
-            filledHouses[key].map((stud) => ({ ...stud, house: key }))
-          )
-          .flat()
-      ];
-      const newHouses = Object.groupBy(newStudents, (stud) => stud.house!) as {
-        [key in House]: Student[];
-      };
-      return {
-        ...state,
-        students: newStudents,
-        houses: newHouses
-      };
-    });
+    const { students: newStudents } = assignStudentsToHouses(
+      students,
+      relations
+    );
+    const filledHouses = Object.groupBy(newStudents, (stud) => stud.house!) as {
+      [key in House]: Student[];
+    };
+
+    store.setState((state) => ({
+      ...state,
+      students: newStudents,
+      houses: filledHouses
+    }));
   }, []);
   return (
     <Container>
